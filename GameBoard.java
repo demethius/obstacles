@@ -12,6 +12,8 @@ import java.awt.event.ComponentListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 
 /**
  * Direction the player is moving
@@ -44,15 +46,16 @@ public class GameBoard extends JPanel implements KeyListener, ComponentListener 
 
     //  Player position
     Point playerPosition = new Point();
-    //  Player Sprite
-    //  @@TODO: add player sprite
+
 
     //  Start position
     Point startPosition = new Point();
     //  Goal position
     Point goalPosition = new Point();
-    //  Goal Sprite
-    //  @@TODO: add goal sprite
+    //  Start Time
+    long startTime;
+    //  Are we Performing a run
+    boolean performingRun = false;
 
     //  Locations of hazards
     ArrayList<Point> hazardPositions = new ArrayList<>();
@@ -62,42 +65,54 @@ public class GameBoard extends JPanel implements KeyListener, ComponentListener 
     ArrayList<Point> resetPositions = new ArrayList<>();
 
     String[] defaultBoardOne = {
-            "*..........",
-            "...........",
-            "...........",
-            "...........",
-            "...o.......",
-            "...........",
-            "...........",
-            "...........",
-            "...........",
-            "..........x",
+            "oooov*voooo",
+            "rrrr...rrrr",
+            "oooo..ooooo",
+            "ooo..oooooo",
+            "ooo.ooooooo",
+            "ooo.ooooooo",
+            "rrr.rrrrrrr",
+            "ooo..oooooo",
+            "ooov...oooo",
+            "ooooor....x",
     };
     String[] defaultBoardTwo = {
-            "..........x",
-            "...........",
-            "...r.......",
-            "...........",
-            "...........",
-            "...........",
-            "...........",
-            "...........",
-            "...........",
-            "*..........",
+            "x...........",
+            ".oooooooooooo",
+            ".rrrvvvvvvvv",
+            "..........oo",
+            "vvvvvvvvv.rr",
+            ".......vv.oo",
+            "v.rrrr....oo",
+            "o.....rrrrrr",
+            "rvrvr.rvrvrr",
+            "*........ooo",
     };
     String[] defaultBoardThree = {
-            "...........",
-            "........v..",
-            "...........",
-            "...........",
-            "....x......",
-            "...........",
-            "...........",
-            "...........",
-            "...........",
-            "..........*",
+            "rxoooooooooo",
+            "v...oooooooo",
+            "rrr.vvvvvvvv",
+            "r.........oo",
+            "vv.vvvvvv.rr",
+            "...o...vv.oo",
+            "v.rrrr....oo",
+            "o.....rrrrrr",
+            "rvrvr.rvrvrr",
+            "*........ooo",
     };
-    String[][] boards = {defaultBoardOne, defaultBoardTwo, defaultBoardThree};
+    String[] defaultBoardFour = {
+            "oooov*voooo",
+            "rrrr...rrrr",
+            "oooo..ooooo",
+            "ooo..oooooo",
+            "ooo.ooooooo",
+            "rrr.rrrrrrr",
+            "ooo..oooooo",
+            "ooov..ooooo",
+            "oooor.....x",
+    };
+    
+    String[][] boards = {defaultBoardOne, defaultBoardTwo, defaultBoardThree, defaultBoardFour};
 
     //  Current board the player is on.
     int currentBoardIndex;
@@ -185,6 +200,12 @@ public class GameBoard extends JPanel implements KeyListener, ComponentListener 
             System.out.println("MAP Goal position not found");
         }
         this.goalPosition = scannedGoalPosition;
+
+        if (this.currentBoardIndex == 0 && !this.performingRun) {
+            this.performingRun = true;
+            JOptionPane.showMessageDialog(this,"Get Ready to start your run!!\n Use arrow keys to move.");
+            this.startTime = Calendar.getInstance().getTimeInMillis();
+        }
     }
 
     //  Draw a tile
@@ -243,8 +264,8 @@ public class GameBoard extends JPanel implements KeyListener, ComponentListener 
     //  Update the size of a cell
     private void updateCellSize() {
         //  Scale the cell dimensions
-        cellHeight = this.getHeight() / (this.boardHeight+1);
-        cellWidth = this.getWidth() / (this.boardWidth+1);
+        cellHeight = this.getHeight() / this.boardHeight;
+        cellWidth = this.getWidth() / this.boardWidth;
     }
 
     //  Move player
@@ -268,16 +289,47 @@ public class GameBoard extends JPanel implements KeyListener, ComponentListener 
     }
     private void checkPlayerCollisions() {
         //  Is the player in board bounds?
-        if (this.tempPlayerPosition.x >= 0 && this.tempPlayerPosition.x <= boardWidth &&
-                this.tempPlayerPosition.y >= 0 && this.tempPlayerPosition.y <= boardHeight) {
+        if (this.tempPlayerPosition.x >= 0 && this.tempPlayerPosition.x < boardWidth &&
+                this.tempPlayerPosition.y >= 0 && this.tempPlayerPosition.y < boardHeight) {
 
-            //  Did the player collide with an obstacle?
-            //  - Update position
-            //  - ??Update Health??
-            //  - Teleport the player
+            //  Collision states
+            boolean isobstacle = false;
+            boolean ishazardPositions = false;
+            boolean isresetPositions = false;
 
-            //  Update the player position.
-            this.playerPosition = this.tempPlayerPosition;
+            //  Check for obstacle Tile
+            for (Point point : this.obstaclePositions) {
+                if (point.equals(this.tempPlayerPosition)) {
+                    isobstacle = true;
+                    break;
+                }
+            }
+
+            //  Check for hazard Tile and reset game back to Level 1
+            for (Point point : this.hazardPositions) {
+                if (point.equals(this.tempPlayerPosition)) {
+                    ishazardPositions = true;
+                    this.currentBoardIndex = 0;
+                    this.resetGame();
+                    this.loadGameBoard();
+                    this.repaint();
+                    break;
+                }
+            }
+
+            //  Check for reset Tile and reset player back to initial position
+            for (Point point : this.resetPositions) {
+                if (point.equals(this.tempPlayerPosition)) {
+                    isresetPositions = true;
+                    this.playerPosition = this.startPosition;
+                    break;
+                }
+            }
+
+            //  If it's not an obstacle/hazard/reset, let player move
+            if (!isobstacle && !ishazardPositions && !isresetPositions) {
+                this.playerPosition = this.tempPlayerPosition;
+            }
         }
     }
 
@@ -315,8 +367,8 @@ public class GameBoard extends JPanel implements KeyListener, ComponentListener 
             case KeyEvent.VK_Q:
                 System.exit(0);
             default:
-                System.out.println("KeyPress = " + keyEvent.getKeyChar());
-                break;
+                return;
+                //System.out.println("KeyPress = " + keyEvent.getKeyChar());
         }
 
         //  Check player collisions
@@ -332,13 +384,13 @@ public class GameBoard extends JPanel implements KeyListener, ComponentListener 
 
             //  Did they also beat the game?
             if (this.beatGame()) {
+                this.performingRun = false;
+                long runTime = Calendar.getInstance().getTimeInMillis() - this.startTime;
                 //  Yes, tell them they won and set the next board to 0
-                JOptionPane.showMessageDialog(this,"You beat the Game!!\n Restarting at level 1");
+                if(JOptionPane.YES_OPTION != JOptionPane.showConfirmDialog(this,"You beat the Game in " + runTime/1000. + " seconds.\n\n\t\t\tPlay Again?\n", "End of Run", JOptionPane.YES_NO_OPTION)) {
+			System.exit(0);
+		}
                 this.resetGame();
-            }
-            else {
-                JOptionPane.showMessageDialog(this,"You beat the board!!");
-                //  No, load the next board.
             }
             this.loadGameBoard();
         }
